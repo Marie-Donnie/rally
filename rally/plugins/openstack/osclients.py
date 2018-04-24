@@ -327,6 +327,7 @@ class Keystone(OSClient):
         sess = self.get_session(version=version)[0]
 
         kw = {"version": version, "session": sess,
+              "region_name": self.credential.region_name,
               "timeout": CONF.openstack_client_http_timeout}
         if keystoneclient.__version__[0] == "1":
             # NOTE(andreykurilin): let's leave this hack for envs which uses
