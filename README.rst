@@ -5,11 +5,11 @@ Rally
 Team and repository tags
 ========================
 
-.. image:: https://governance.openstack.org/badges/rally.svg
-    :target: https://governance.openstack.org/reference/tags/index.html
+.. image:: https://governance.openstack.org/tc/badges/rally.svg
+    :target: https://governance.openstack.org/tc/reference/tags/index.html
 
 .. image:: https://img.shields.io/pypi/v/rally.svg
-    :target: https://pypi.python.org/pypi/rally/
+    :target: https://pypi.org/project/rally/
     :alt: Latest Version
 
 .. image:: https://img.shields.io/badge/gitter-join_chat-ff69b4.svg

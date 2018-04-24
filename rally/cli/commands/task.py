@@ -25,7 +25,6 @@ import sys
 import webbrowser
 
 import jsonschema
-from oslo_utils import uuidutils
 import six
 
 from rally.cli import cliutils
@@ -42,6 +41,7 @@ from rally.task import atomic
 from rally.task.processing import charts
 from rally.task.processing import plot
 from rally.task import utils as tutils
+from rally.utils import strutils
 
 
 LOG = logging.getLogger(__name__)
@@ -505,9 +505,9 @@ class TaskCommands(object):
                         print()
 
             print("Load duration: %s"
-                  % rutils.format_float_to_str(workload["load_duration"]))
+                  % strutils.format_float_to_str(workload["load_duration"]))
             print("Full duration: %s"
-                  % rutils.format_float_to_str(workload["full_duration"]))
+                  % strutils.format_float_to_str(workload["full_duration"]))
 
         print("\nHINTS:")
         print("* To plot HTML graphics with this data, run:")
@@ -667,7 +667,7 @@ class TaskCommands(object):
         """Load the json file which is created by `rally task results`"""
 
         with open(os.path.expanduser(task_id)) as inp_js:
-            tasks_results = yaml.safe_load(inp_js)
+            tasks_results = json.loads(inp_js.read())
 
         if isinstance(tasks_results, list):
             # it is an old format:
@@ -811,7 +811,7 @@ class TaskCommands(object):
         for task_id in tasks:
             if os.path.exists(os.path.expanduser(task_id)):
                 results.extend(self._load_task_results_file(api, task_id))
-            elif uuidutils.is_uuid_like(task_id):
+            elif strutils.is_uuid_like(task_id):
                 results.append(api.task.get(task_id=task_id, detailed=True))
             else:
                 print("ERROR: Invalid UUID or file name passed: %s" % task_id,
@@ -831,7 +831,7 @@ class TaskCommands(object):
         else:
             print(result)
 
-    @cliutils.deprecated_args("--tasks", dest="task_id", nargs="+",
+    @cliutils.deprecated_args("--tasks", dest="tasks", nargs="+",
                               release="0.10.0", alternative="--uuid")
     @cliutils.args("--out", metavar="<path>",
                    type=str, dest="out", required=False,

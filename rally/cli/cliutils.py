@@ -23,9 +23,7 @@ import sys
 import textwrap
 import warnings
 
-import decorator
 import jsonschema
-from oslo_utils import encodeutils
 import prettytable
 import six
 import sqlalchemy.exc
@@ -35,6 +33,7 @@ from rally.common import cfg
 from rally.common import logging
 from rally.common.plugin import info
 from rally import exceptions
+from rally.utils import encodeutils
 
 
 CONF = cfg.CONF
@@ -316,23 +315,6 @@ def suppress_warnings(f):
     return f
 
 
-@decorator.decorator
-def process_keystone_exc(f, *args, **kwargs):
-    from keystoneclient import exceptions as keystone_exc
-
-    try:
-        return f(*args, **kwargs)
-    except keystone_exc.Unauthorized as e:
-        print("User credentials are wrong! \n%s" % e)
-        return 1
-    except keystone_exc.AuthorizationFailure as e:
-        print("Failed to authorize! \n%s" % e)
-        return 1
-    except keystone_exc.ConnectionRefused as e:
-        print("Rally can't reach the Keystone service! \n%s" % e)
-        return 1
-
-
 class CategoryParser(argparse.ArgumentParser):
 
     """Customized arguments parser
@@ -423,16 +405,19 @@ def deprecated_args(*args, **kwargs):
         if "release" not in kwargs:
             raise ValueError("'release' is required keyword argument of "
                              "'deprecated_args' decorator.")
-        func.__dict__.setdefault("args", []).insert(0, (args, kwargs))
-        func.__dict__.setdefault("deprecated_args", [])
-        func.deprecated_args.append(args[0])
+        release = kwargs.pop("release")
+        alternative = kwargs.pop("alternative", None)
 
-        help_msg = "[Deprecated since Rally %s] " % kwargs.pop("release")
-        if "alternative" in kwargs:
-            help_msg += "Use '%s' instead. " % kwargs.pop("alternative")
+        help_msg = "[Deprecated since Rally %s] " % release
+        if alternative:
+            help_msg += "Use '%s' instead. " % alternative
         if "help" in kwargs:
             help_msg += kwargs["help"]
         kwargs["help"] = help_msg
+
+        func.__dict__.setdefault("args", []).insert(0, (args, kwargs))
+        func.__dict__.setdefault("deprecated_args", {})
+        func.deprecated_args[args[0]] = (release, alternative)
         return func
     return _decorator
 
@@ -573,10 +558,13 @@ def validate_deprecated_args(argv, fn):
     if (len(argv) > 3
        and (argv[2] == fn.__name__)
        and getattr(fn, "deprecated_args", None)):
-        for item in fn.deprecated_args:
+        for item, details in fn.deprecated_args.items():
             if item in argv[3:]:
-                LOG.warning("Deprecated argument %s for %s." % (item,
-                                                                fn.__name__))
+                msg = ("The argument `%s` is deprecated since Rally %s." %
+                       (item, details[0]))
+                if details[1]:
+                    msg += " Use `%s` instead." % details[1]
+                LOG.warning(msg)
 
 
 def run(argv, categories):

@@ -19,6 +19,7 @@ import re
 import shutil
 import sys
 
+import pkg_resources
 import six
 
 from rally.common.io import subunit_v2
@@ -97,17 +98,17 @@ class VerifierManager(plugin.Plugin):
                     run_args.setdefault(k, v)
 
         doc = cls.__doc__ or ""
-        doc += "\n**Running arguments**:\n%s" % "\n".join(
-            sorted(["  * *%s*: %s" % (k, v) for k, v in run_args.items()]))
+        doc += "\n**Running arguments**:\n\n%s" % "\n".join(
+            sorted(["* *%s*: %s" % (k, v) for k, v in run_args.items()]))
 
-        doc += "\n**Installation arguments**:\n"
-        doc += ("  * *system_wide*: Whether or not to use the system-wide "
+        doc += "\n\n**Installation arguments**:\n\n"
+        doc += ("* *system_wide*: Whether or not to use the system-wide "
                 "environment for verifier instead of a virtual environment. "
                 "Defaults to False.\n"
-                "  * *source*: Path or URL to the repo to clone verifier from."
+                "* *source*: Path or URL to the repo to clone verifier from."
                 " Defaults to %(default_source)s\n"
-                "  * *version*: Branch, tag or commit ID to checkout before "
-                "verifier installation. Defaults to '%(default_version)s'."
+                "* *version*: Branch, tag or commit ID to checkout before "
+                "verifier installation. Defaults to '%(default_version)s'.\n"
                 % {"default_source": cls._meta_get("default_repo"),
                    "default_version": cls._meta_get(
                        "default_version") or "master"})
@@ -275,20 +276,18 @@ class VerifierManager(plugin.Plugin):
     def check_system_wide(self, reqs_file_path=None):
         """Check that all required verifier packages are installed."""
         LOG.debug("Checking system-wide packages for verifier.")
-        import pip
         reqs_file_path = reqs_file_path or os.path.join(self.repo_dir,
                                                         "requirements.txt")
-        required_packages = set(
-            [r.name.lower() for r in pip.req.parse_requirements(
-                reqs_file_path, session=False)])
-        installed_packages = set(
-            [r.key for r in pip.get_installed_distributions()])
-        missed_packages = required_packages - installed_packages
-        if missed_packages:
-            raise VerifierSetupFailure(
-                "Missed package(s) for system-wide installation found. "
-                "Please install '%s'." % "', '".join(sorted(missed_packages)),
-                verifier=self.verifier.name)
+        with open(reqs_file_path) as f:
+            required_packages = [
+                p for p in f.read().split("\n")
+                if p.strip() and not p.startswith("#")
+            ]
+        try:
+            pkg_resources.require(required_packages)
+        except (pkg_resources.DistributionNotFound,
+                pkg_resources.VersionConflict) as e:
+            raise VerifierSetupFailure(e.report(), verifier=self.verifier.name)
 
     def checkout(self, version):
         """Switch a verifier repo."""

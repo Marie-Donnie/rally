@@ -219,33 +219,23 @@ class VerifierManagerTestCase(test.TestCase):
             self.check_output.call_args_list)
         mock_rmtree.assert_called_once_with(vmanager.venv_dir)
 
-    def test_check_system_wide(self):
+    @mock.patch("rally.verification.manager.open")
+    def test_check_system_wide(self, mock_open):
+        r_file = mock_open.return_value.__enter__.return_value
+        r_file.read.return_value = "\n#comment\nrequests>1.2   # Licence\n"
+
         vmanager = FakeVerifier(mock.Mock())
-        pip_module = mock.Mock()
-        pip_module_gid = pip_module.get_installed_distributions
 
-        packages = []
-        for name in ("SQLAlchemy", "NumPy"):
-            packages.append(mock.Mock())
-            packages[-1].name = name
-        pip_module.req.parse_requirements.return_value = packages
+        vmanager.check_system_wide()
+        mock_open.assert_called_once_with(
+            "%s/requirements.txt" % vmanager.repo_dir)
+        mock_open.reset_mock()
 
-        with mock.patch.dict("sys.modules", {"pip": pip_module}):
-            pip_module_gid.return_value = [mock.Mock(key="sqlalchemy"),
-                                           mock.Mock(key="numpy")]
-
-            vmanager.check_system_wide()
-            pip_module.req.parse_requirements.assert_called_once_with(
-                "%s/requirements.txt" % vmanager.repo_dir, session=False)
-            pip_module_gid.assert_called_once_with()
-
-            # failure
-            pip_module_gid.reset_mock()
-            missed_package = pip_module_gid.return_value.pop()
-            e = self.assertRaises(manager.VerifierSetupFailure,
-                                  vmanager.check_system_wide)
-            self.assertIn("Please install '%s'." % missed_package.key,
-                          "%s" % e)
+        # failure
+        r_file.read.return_value = "\n#comment\nNumPy>1.2   # Licence\n"
+        e = self.assertRaises(manager.VerifierSetupFailure,
+                              vmanager.check_system_wide)
+        self.assertIn("NumPy>1.2", "%s" % e)
 
     def test_checkout(self):
         vmanager = FakeVerifier(mock.Mock())
@@ -358,23 +348,23 @@ class VerifierManagerTestCase(test.TestCase):
     def test__get_doc(self):
         self.assertEqual(
             "\n"
-            "**Running arguments**:\n"
-            "  * *concurrency*: Number of processes to be used for launching "
+            "**Running arguments**:\n\n"
+            "* *concurrency*: Number of processes to be used for launching "
             "tests. In case of 0 value, number of processes will be equal to "
             "number of CPU cores.\n"
-            "  * *load_list*: a list of tests to launch.\n"
-            "  * *pattern*: a regular expression of tests to launch.\n"
-            "  * *skip_list*: a list of tests to skip (actually, it is a dict "
+            "* *load_list*: a list of tests to launch.\n"
+            "* *pattern*: a regular expression of tests to launch.\n"
+            "* *skip_list*: a list of tests to skip (actually, it is a dict "
             "where keys are names of tests, values are reasons).\n"
-            "  * *xfail_list*: a list of tests that are expected to fail "
+            "* *xfail_list*: a list of tests that are expected to fail "
             "(actually, it is a dict where keys are names of tests, values "
-            "are reasons).\n"
-            "**Installation arguments**:\n"
-            "  * *system_wide*: Whether or not to use the system-wide "
+            "are reasons).\n\n"
+            "**Installation arguments**:\n\n"
+            "* *system_wide*: Whether or not to use the system-wide "
             "environment for verifier instead of a virtual environment. "
             "Defaults to False.\n"
-            "  * *source*: Path or URL to the repo to clone verifier from. "
+            "* *source*: Path or URL to the repo to clone verifier from. "
             "Defaults to https://git.example.com\n"
-            "  * *version*: Branch, tag or commit ID to checkout before "
-            "verifier installation. Defaults to '%s'." % DEFAULT_VERSION,
+            "* *version*: Branch, tag or commit ID to checkout before "
+            "verifier installation. Defaults to '%s'.\n" % DEFAULT_VERSION,
             FakeVerifier._get_doc())
